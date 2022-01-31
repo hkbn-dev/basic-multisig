@@ -18,6 +18,10 @@ contract MultiSignatureWallet {
     receive() external payable {}
     fallback() external payable {}
 
+    event approveTx(address indexed _from);
+    event disapproveTx(address indexed _from);
+    event executeTx(uint _approvedCount, uint _disapprovedCount);
+
     constructor(address _signer1, address _signer2, address _signer3) {
         signatures[0] = _signer1;
         signatures[1] = _signer2;
@@ -27,17 +31,17 @@ contract MultiSignatureWallet {
     }
 
     modifier onlyOwner {
-        require(msg.sender == signatures[0] || msg.sender == signatures[1] || msg.sender == signatures[2]);
+        require(msg.sender == signatures[0] || msg.sender == signatures[1] || msg.sender == signatures[2], "Error: Invalid owner.");
         _;
     }
 
     modifier notContestingApproval {
-        require(!contestingApproval);
+        require(!contestingApproval, "Error: A proposal is already contesting approval.");
         _;
     }
 
     modifier isContestingApproval {
-        require(contestingApproval);
+        require(contestingApproval, "Error: A proposal is not contesting approval..");
         _;
     }
 
@@ -91,12 +95,16 @@ contract MultiSignatureWallet {
     }
 
     function approveTransaction() public onlyOwner isContestingApproval {
+        emit approveTx(msg.sender);
+
         signatureToApproval[msg.sender] = true;
         signatureToVoted[msg.sender] = true;
         executeTransactionIfPossible();
     }
 
     function disapproveTransaction() public onlyOwner isContestingApproval {
+        emit disapproveTx(msg.sender);
+
         signatureToApproval[msg.sender] = false;
         signatureToVoted[msg.sender] = true;
         executeTransactionIfPossible();

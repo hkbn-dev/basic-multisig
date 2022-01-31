@@ -21,16 +21,8 @@ describe("MultiSignatureWallet", () => {
     });
 
   it("Should deposit", async function () {
-    let  provider = ethers.provider;
-    // const [addr1, addr2, addr3] = await ethers.getSigners();
-    // const multiSignatureWalletFactory = await ethers.getContractFactory("MultiSignatureWallet");
-    // const multiSignatureWalletContract = await multiSignatureWalletFactory.deploy(addr1.getAddress(), addr2.getAddress(), addr3.getAddress());
-    // const multiSignatureWallet = await multiSignatureWalletContract.deployed();
-
     let currBalance = await multiSignatureWallet.getBalance();
     expect(currBalance).to.equal(0);
-
-    console.log(await provider.getBalance(addr1.getAddress()));
 
     const tx = await addr1.sendTransaction({
       to: multiSignatureWallet.address,
@@ -51,12 +43,34 @@ describe("MultiSignatureWallet", () => {
   });
 
   it("Should not be able to propose transaction if contesting approval", async function() {
-    let currentRecipient = await multiSignatureWallet.getCurrentRecipient();
-    expect(currentRecipient).to.equal(multiSignatureWallet.address);
-    
     await multiSignatureWallet.proposeTransaction(addr1.address);
-    currentRecipient = await multiSignatureWallet.getCurrentRecipient();
-    expect(currentRecipient).to.equal(addr1.address);
+    await expect (
+       multiSignatureWallet.proposeTransaction(addr2.address)
+      ).to.be.revertedWith("Error: A proposal is already contesting approval.");
+    
+  });
+
+  it("Should not be able to propose transaction if not one of the original owners", async function() {
+    const [, , , addr4] = await ethers.getSigners();
+    await expect(
+      multiSignatureWallet.connect(addr4).proposeTransaction(addr4.address)
+    ).to.be.revertedWith("Error: Invalid owner.");
+  });
+
+  it("Should be able to approve transaction", async function() {
+    await multiSignatureWallet.proposeTransaction(addr1.address);
+    await expect(
+      multiSignatureWallet.connect(addr2).approveTransaction()
+    ).to.emit(multiSignatureWallet, "approveTx")
+    .withArgs(addr2.address);
+  });
+
+    it("Should be able to disapprove transaction", async function() {
+    await multiSignatureWallet.proposeTransaction(addr1.address);
+    await expect(
+      multiSignatureWallet.connect(addr2).disapproveTransaction()
+    ).to.emit(multiSignatureWallet, "disapproveTx")
+    .withArgs(addr2.address);
   });
 
 });
